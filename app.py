@@ -1,6 +1,7 @@
 import os
 import subprocess
 import openai
+import json
 
 from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
@@ -39,7 +40,6 @@ def upload_file():
             filename = secure_filename(file.filename)
             file_path = os.path.join(os.getenv("PROJECT_DIR"), app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-            # print(os.path.exists(os.path.join(os.getenv("PROJECT_DIR"), app.config['UPLOAD_FOLDER'], filename)))
             return processing_image(file_path)
             # return redirect(url_for('upload_file', result='processing'))
 
@@ -47,32 +47,120 @@ def upload_file():
     return render_template("index.html", result=result)
 
 def processing_image(file_path: os.path):
-    subprocess.run(['handprint', file_path, '/s', 'microsoft', '/e','/j'])
+    subprocess.run(['handprint', file_path, '/d', 'text,bb-word,bb-line',  '/s', 'microsoft', '/e','/j'])
     return parsing(file_path)
 
 def parsing(file_path: os.path):
     head, tail = os.path.split(file_path)
-    new_tail = tail[:tail.rfind('.')] + ".handprint-microsoft.txt"
-    new_file = os.path.join(head, new_tail)
-    # print(os.path.join(head, new_tail))
-    with open(new_file) as f:
-        lines = f.readlines()
-        response = openai.Completion.create(
-            model="text-davinci-003",
-            prompt=generate_prompt(lines),
-            temperature=0,
-        )
+    ca_tail = tail[:tail.rfind('.')] + ".custom-alignment.txt"
+    new_tail_json = tail[:tail.rfind('.')] + ".handprint-microsoft.json"
+    ca_file = os.path.join(head, ca_tail)
+    new_file_json = os.path.join(head, new_tail_json)
+
+    words = []
+    with open(new_file_json) as f_json:
+        json_file = json.load(f_json)
+        for json_line in json_file["analyzeResult"]["readResults"][0]["lines"]:
+            for word in json_line["words"]:
+                words.append(Word(word["boundingBox"], word["text"]))
+
+        words.sort(key=lambda word: word.center.y)
+
+    text = []
+    current_word_it = 0
+    current_center = CurrentCenter(words[current_word_it].center, words[current_word_it].height)
+    line = []
+    line.append(words[current_word_it])
+
+    while current_word_it < words.__len__() - 1:
+        current_word_it += 1
+        current_word = words[current_word_it]
+        if current_word.center.y + current_word.height/3 > current_center.upper and current_word.center.y - current_word.height/3 < current_center.lower:
+            current_center.append(current_word.center, current_word.height)
+            line.append(current_word)
+        else:
+            text.append(line)
+            line = []
+            line.append(current_word)
+            current_center = CurrentCenter(words[current_word_it].center, words[current_word_it].height)
+    text.append(line)
+
+    for line in text:
+        line.sort(key=lambda word: word.center.x)
+
+    lines = ''
+    with open(ca_file, "w") as ca_f:
+        for line in text:
+            for word in line:
+                lines += word.text + " "
+                ca_f.write(word.text+" ")
+            ca_f.write("\n")
+            lines += "\n"
+
+
+    response = openai.Completion.create(
+        model="text-davinci-003",
+        prompt=generate_prompt(lines),
+        temperature=0,
+    )
     print(response)
     return redirect(url_for("upload_file", result=response.choices[0].text))
 
 def generate_prompt(lines):
     return '''
-    Doctor wrote a prescription, then it was read by neural network. Extract from prescription name of medicine, how many times a day, how much, for how long, in the following format:
-name of medicine | how many times a day | how much | for how long in days.
-Absolutely do not change names of medicine. Use full names of medicine if provided. Take note that words can be in wrong order or in wrong lines.
+Doctor wrote a prescription, then it was read by neural network. Prescription may have several medicines prescribed. Extract from prescription: name of medicine, how many times a day, how much, for how long.
+Write it in the following format
+1. name of first medicine | how many times a day | how much | for how long in days.
+2. name of second medicine | how many times a day | how much | for how long in days.
+...
+
+Absolutely do not change names of medicine.
 
 Prescription in question:
 \'\'\'
 {}
 \'\'\'
-    '''.format(lines)
+'''.format(lines)
+
+
+class Word:
+    class Dot:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
+
+
+    @staticmethod
+    def get_center(box: list):
+        return ((box[0] + box[2] + box[4] + box[6])/4, (box[1] + box[3] + box[5] + box[7])/4)
+
+    def __init__(self, boundingBox: list, text: str):
+        self.up_left = self.Dot(boundingBox[0], boundingBox[1])
+        self.up_right = self.Dot(boundingBox[2], boundingBox[3])
+        self.down_right = self.Dot(boundingBox[4], boundingBox[5])
+        self.down_left = self.Dot(boundingBox[6], boundingBox[7])
+        self.text: str = text
+        self.center = self.Dot(*self.get_center(boundingBox))
+
+        self.upmost: int = min(self.up_left.y, self.up_right.y)
+        self.downmost: int = max(self.down_left.y, self.down_right.y)
+        self.height = self.downmost - self.upmost
+
+    def __str__(self):
+        return self.text
+
+
+class CurrentCenter:
+    def __init__(self, dot: Word.Dot, height: int):
+        self.center_count = 1
+        self.current_center = Word.Dot(dot.x, dot.y)
+        self.height = float(height)
+        self.upper = self.current_center.y - self.height/2
+        self.lower = self.current_center.y + self.height/2
+
+    def append(self, dot: Word.Dot, height: int):
+        self.center_count += 1
+        self.current_center = Word.Dot((self.current_center.x * (self.center_count - 1) + dot.x) / self.center_count, (self.current_center.y * (self.center_count - 1) + dot.y) / self.center_count)
+        self.height = (self.height * (self.center_count - 1) + height) / self.center_count
+        self.upper = self.current_center.y - self.height/2
+        self.lower = self.current_center.y + self.height/2
