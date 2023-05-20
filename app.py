@@ -48,7 +48,6 @@ def upload_file():
 
 def processing_image(file_path: os.path):
     subprocess.run(['handprint', file_path, '/s', 'microsoft', '/e','/j'])
-    # print("done")
     return parsing(file_path)
 
 def parsing(file_path: os.path):
@@ -68,10 +67,11 @@ def parsing(file_path: os.path):
 
 def generate_prompt(lines):
     return '''
-    doctor wrote a prescription, then it was read by neural network. Please extract from prescription name of medicine, how many times a day, how much, for how long, in the following format:
-name of medicine | how many times a day | how much | for how long
+    Doctor wrote a prescription, then it was read by neural network. Extract from prescription name of medicine, how many times a day, how much, for how long, in the following format:
+name of medicine | how many times a day | how much | for how long in days.
+Absolutely do not change names of medicine. Use full names of medicine if provided. Take note that words can be in wrong order or in wrong lines.
 
-Prescription
+Prescription in question:
 \'\'\'
 {}
 \'\'\'
