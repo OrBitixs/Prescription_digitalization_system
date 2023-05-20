@@ -1,0 +1,24 @@
+<!doctype html>
+<head>
+  <title>Analyze prescription</title>
+</head>
+<body>
+  <h1>Upload new File</h1>
+  <form method=post enctype=multipart/form-data>
+    <input type=file name=file>
+    <input type=submit value=Upload>
+  </form>
+  {% if result==None: %}
+  {% else %}
+    {% if result=="processing": %}
+      <h3>Processing image</h3>
+    {% endif %}
+    {% if result=="parsing": %}
+      <h3>Parsing data</h3>
+    {% else %}
+      <h3>Result: {{ result }}</h3>
+
+    {% endif %}
+
+  {% endif %}
+</body>

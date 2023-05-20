@@ -1,0 +1,6 @@
+__pycache__
+.idea
+.venv
+.venv3.9
+.env
+uploads
