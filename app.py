@@ -40,17 +40,21 @@ def upload_file():
             filename = secure_filename(file.filename)
             file_path = os.path.join(os.getenv("PROJECT_DIR"), app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-            return processing_image(file_path)
+            return redirect(url_for('processing_image', file_path=file_path))
             # return redirect(url_for('upload_file', result='processing'))
 
     result = request.args.get("result")
     return render_template("index.html", result=result)
 
-def processing_image(file_path: os.path):
+@app.route('/process', methods=['GET'])
+def processing_image():
+    file_path = request.args.get("file_path")
     subprocess.run(['handprint', file_path, '/d', 'text,bb-word,bb-line',  '/s', 'microsoft', '/e','/j'])
-    return parsing(file_path)
+    return redirect(url_for("parsing", file_path=file_path))
 
-def parsing(file_path: os.path):
+@app.route('/parse', methods=['GET'])
+def parsing():
+    file_path = request.args.get("file_path")
     head, tail = os.path.split(file_path)
     ca_tail = tail[:tail.rfind('.')] + ".custom-alignment.txt"
     new_tail_json = tail[:tail.rfind('.')] + ".handprint-microsoft.json"
