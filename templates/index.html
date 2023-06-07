@@ -14,14 +14,16 @@
   <div class="container">
     <div class="image-container">
     {% if result!=None: %}
-      <img src="{{url_for('static', filename='images/Sample-prescription.handprint-all.png')}}" align="middle" />
+      <img src="/static/images/{{ recognized_image }}" align="middle" />
     {% endif %}
     </div>
     <div class="result-container">
       <div>
         {% if result!=None: %}
           <h3>Result:</h3>
-          <div>{{ full_result }}</div>
+          <div>
+            <pre>{{ full_result }}</pre>
+          </div>
         {% endif %}
       </div>
       <div>

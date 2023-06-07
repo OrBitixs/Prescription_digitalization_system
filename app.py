@@ -53,17 +53,21 @@ def upload_file():
 
     if file_path != None:
         head, tail = os.path.split(file_path)
-        RI_path = os.path.join("static", "images", tail)
-        new_file_path = RI_path[:RI_path.rfind('.')] + ".handprint-all" + RI_path[RI_path.rfind('.'):]
+        # RI_path = os.path.join("images", tail)
+        new_file_path = tail[:tail.rfind('.')] + ".handprint-all" + tail[tail.rfind('.'):]
 
         with open(file_path[:file_path.rfind('.')] + ".custom-alignment.txt") as CA_file:
             result_lines = CA_file.readlines()
 
+
+    sum_str = ''
+    for line in result_lines:
+        sum_str += line
     # print("-"*15)
     # print(file_path)
     # print(new_file_path)
     # print("-"*15)
-    return render_template("index.html", result=result, full_result=result_lines, recognized_image=new_file_path)
+    return render_template("index.html", result=result, full_result=sum_str, recognized_image=new_file_path)
 
 @app.route('/process', methods=['GET'])
 def processing_image():
