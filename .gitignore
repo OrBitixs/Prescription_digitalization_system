@@ -4,3 +4,4 @@ __pycache__
 .venv3.9
 .env
 uploads
+static/images

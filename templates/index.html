@@ -1,24 +1,35 @@
 <!doctype html>
 <head>
   <title>Analyze prescription</title>
+  <link rel="stylesheet" href="../static/main.css">
 </head>
 <body>
+  <div>
   <h1>Upload new File</h1>
   <form method=post enctype=multipart/form-data>
     <input type=file name=file>
     <input type=submit value=Upload>
   </form>
-  {% if result==None: %}
-  {% else %}
-    {% if result=="processing": %}
-      <h3>Processing image</h3>
+  </div>
+  <div class="container">
+    <div class="image-container">
+    {% if result!=None: %}
+      <img src="{{url_for('static', filename='images/Sample-prescription.handprint-all.png')}}" align="middle" />
     {% endif %}
-    {% if result=="parsing": %}
-      <h3>Parsing data</h3>
-    {% else %}
-      <h3>Result: {{ result }}</h3>
-
-    {% endif %}
-
-  {% endif %}
+    </div>
+    <div class="result-container">
+      <div>
+        {% if result!=None: %}
+          <h3>Result:</h3>
+          <div>{{ full_result }}</div>
+        {% endif %}
+      </div>
+      <div>
+        {% if result!=None: %}
+          <h3>Composed result:</h3>
+          <div>{{ result }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 </body>

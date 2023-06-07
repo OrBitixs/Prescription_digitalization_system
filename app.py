@@ -2,6 +2,7 @@ import os
 import subprocess
 import openai
 import json
+import shutil
 
 from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
@@ -13,6 +14,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.static_folder = os.path.join(os.getenv("PROJECT_DIR"), "static")
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -44,12 +46,33 @@ def upload_file():
             # return redirect(url_for('upload_file', result='processing'))
 
     result = request.args.get("result")
-    return render_template("index.html", result=result)
+    file_path = request.args.get("file_path")
+
+    new_file_path = ''
+    result_lines = ''
+
+    if file_path != None:
+        head, tail = os.path.split(file_path)
+        RI_path = os.path.join("static", "images", tail)
+        new_file_path = RI_path[:RI_path.rfind('.')] + ".handprint-all" + RI_path[RI_path.rfind('.'):]
+
+        with open(file_path[:file_path.rfind('.')] + ".custom-alignment.txt") as CA_file:
+            result_lines = CA_file.readlines()
+
+    # print("-"*15)
+    # print(file_path)
+    # print(new_file_path)
+    # print("-"*15)
+    return render_template("index.html", result=result, full_result=result_lines, recognized_image=new_file_path)
 
 @app.route('/process', methods=['GET'])
 def processing_image():
     file_path = request.args.get("file_path")
     subprocess.run(['handprint', file_path, '/d', 'text,bb-word,bb-line',  '/s', 'microsoft', '/e','/j'])
+    head, tail = os.path.split(file_path)
+    src = file_path[:file_path.rfind('.')]+".handprint-all"+file_path[file_path.rfind('.'):]
+    print("src: ", src)
+    shutil.copyfile(src, os.path.normpath(os.path.join(head, "..", "static", "images", os.path.basename(src))))
     return redirect(url_for("parsing", file_path=file_path))
 
 @app.route('/parse', methods=['GET'])
@@ -102,13 +125,15 @@ def parsing():
             lines += "\n"
 
 
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=generate_prompt(lines),
-        temperature=0,
-    )
-    print(response)
-    return redirect(url_for("upload_file", result=response.choices[0].text))
+    # response = openai.Completion.create(
+    #     model="text-davinci-003",
+    #     prompt=generate_prompt(lines),
+    #     temperature=0,
+    # )
+    # print(response)
+    fake_result="fake result"
+    # return redirect(url_for("upload_file", result=response.choices[0].text, file_path=file_path))
+    return redirect(url_for("upload_file", result=fake_result, file_path=file_path))
 
 def generate_prompt(lines):
     return '''
