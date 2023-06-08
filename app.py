@@ -129,15 +129,15 @@ def parsing():
             lines += "\n"
 
 
-    # response = openai.Completion.create(
-    #     model="text-davinci-003",
-    #     prompt=generate_prompt(lines),
-    #     temperature=0,
-    # )
+    response = openai.Completion.create(
+        model="text-davinci-003",
+        prompt=generate_prompt(lines),
+        temperature=0,
+    )
     # print(response)
-    fake_result="fake result"
-    # return redirect(url_for("upload_file", result=response.choices[0].text, file_path=file_path))
-    return redirect(url_for("upload_file", result=fake_result, file_path=file_path))
+    # fake_result="fake result"
+    return redirect(url_for("upload_file", result=response.choices[0].text, file_path=file_path))
+    # return redirect(url_for("upload_file", result=fake_result, file_path=file_path))
 
 def generate_prompt(lines):
     return '''
