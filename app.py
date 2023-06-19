@@ -3,6 +3,7 @@ import subprocess
 import openai
 import json
 import shutil
+import time
 
 from flask import Flask, flash, request, redirect, url_for, render_template
 from werkzeug.utils import secure_filename
@@ -20,6 +21,48 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def word_distribution(new_file_json, ca_file):
+    words = []
+    with open(new_file_json) as f_json:
+        json_file = json.load(f_json)
+        for json_line in json_file["analyzeResult"]["readResults"][0]["lines"]:
+            for word in json_line["words"]:
+                words.append(Word(word["boundingBox"], word["text"]))
+
+        words.sort(key=lambda word: word.center.y)
+
+    text = []
+    current_word_it = 0
+    current_center = CurrentCenter(words[current_word_it].center, words[current_word_it].height)
+    line = []
+    line.append(words[current_word_it])
+
+    while current_word_it < words.__len__() - 1:
+        current_word_it += 1
+        current_word = words[current_word_it]
+        if current_word.center.y + current_word.height/3 > current_center.upper and current_word.center.y - current_word.height/3 < current_center.lower:
+            current_center.append(current_word.center, current_word.height)
+            line.append(current_word)
+        else:
+            text.append(line)
+            line = []
+            line.append(current_word)
+            current_center = CurrentCenter(words[current_word_it].center, words[current_word_it].height)
+    text.append(line)
+
+    for line in text:
+        line.sort(key=lambda word: word.center.x)
+
+    lines = ''
+    with open(ca_file, "w") as ca_f:
+        for line in text:
+            for word in line:
+                lines += word.text + " "
+                ca_f.write(word.text+" ")
+            ca_f.write("\n")
+            lines += "\n"
+
+    return lines
 
 
 
@@ -63,16 +106,16 @@ def upload_file():
     sum_str = ''
     for line in result_lines:
         sum_str += line
-    # print("-"*15)
-    # print(file_path)
-    # print(new_file_path)
-    # print("-"*15)
+
     return render_template("index.html", result=result, full_result=sum_str, recognized_image=new_file_path)
 
 @app.route('/process', methods=['GET'])
 def processing_image():
     file_path = request.args.get("file_path")
+    start_handprint = time.time()
     subprocess.run(['handprint', file_path, '/d', 'text,bb-word,bb-line',  '/s', 'microsoft', '/e','/j'])
+    end_handprint = time.time()
+    print("Handprint has finished, time elapsed:", end_handprint-start_handprint)
     head, tail = os.path.split(file_path)
     src = file_path[:file_path.rfind('.')]+".handprint-all.png"
     print("src: ", src)
@@ -88,52 +131,19 @@ def parsing():
     ca_file = os.path.join(head, ca_tail)
     new_file_json = os.path.join(head, new_tail_json)
 
-    words = []
-    with open(new_file_json) as f_json:
-        json_file = json.load(f_json)
-        for json_line in json_file["analyzeResult"]["readResults"][0]["lines"]:
-            for word in json_line["words"]:
-                words.append(Word(word["boundingBox"], word["text"]))
+    start_word_distribution = time.time()
+    lines = word_distribution(new_file_json, ca_file)
+    end_word_distribution = time.time()
+    print("Word distribution algorithm has finished, time elapsed:", end_word_distribution-start_word_distribution)
 
-        words.sort(key=lambda word: word.center.y)
-
-    text = []
-    current_word_it = 0
-    current_center = CurrentCenter(words[current_word_it].center, words[current_word_it].height)
-    line = []
-    line.append(words[current_word_it])
-
-    while current_word_it < words.__len__() - 1:
-        current_word_it += 1
-        current_word = words[current_word_it]
-        if current_word.center.y + current_word.height/3 > current_center.upper and current_word.center.y - current_word.height/3 < current_center.lower:
-            current_center.append(current_word.center, current_word.height)
-            line.append(current_word)
-        else:
-            text.append(line)
-            line = []
-            line.append(current_word)
-            current_center = CurrentCenter(words[current_word_it].center, words[current_word_it].height)
-    text.append(line)
-
-    for line in text:
-        line.sort(key=lambda word: word.center.x)
-
-    lines = ''
-    with open(ca_file, "w") as ca_f:
-        for line in text:
-            for word in line:
-                lines += word.text + " "
-                ca_f.write(word.text+" ")
-            ca_f.write("\n")
-            lines += "\n"
-
-
+    start_gpt = time.time()
     response = openai.Completion.create(
         model="text-davinci-003",
         prompt=generate_prompt(lines),
         temperature=0,
     )
+    end_gpt = time.time()
+    print("Chat-GPT has finished, time elapsed:", end_gpt-start_gpt)
     # print(response)
     # fake_result="fake result"
     return redirect(url_for("upload_file", result=response.choices[0].text, file_path=file_path))
