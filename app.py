@@ -54,7 +54,7 @@ def upload_file():
     if file_path != None:
         head, tail = os.path.split(file_path)
         # RI_path = os.path.join("images", tail)
-        new_file_path = tail[:tail.rfind('.')] + ".handprint-all" + tail[tail.rfind('.'):]
+        new_file_path = tail[:tail.rfind('.')] + ".handprint-all.png"
 
         with open(file_path[:file_path.rfind('.')] + ".custom-alignment.txt") as CA_file:
             result_lines = CA_file.readlines()
@@ -74,7 +74,7 @@ def processing_image():
     file_path = request.args.get("file_path")
     subprocess.run(['handprint', file_path, '/d', 'text,bb-word,bb-line',  '/s', 'microsoft', '/e','/j'])
     head, tail = os.path.split(file_path)
-    src = file_path[:file_path.rfind('.')]+".handprint-all"+file_path[file_path.rfind('.'):]
+    src = file_path[:file_path.rfind('.')]+".handprint-all.png"
     print("src: ", src)
     shutil.copyfile(src, os.path.normpath(os.path.join(head, "..", "static", "images", os.path.basename(src))))
     return redirect(url_for("parsing", file_path=file_path))
